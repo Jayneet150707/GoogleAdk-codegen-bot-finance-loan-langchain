@@ -176,7 +176,42 @@ def get_similar_loan_applications(applicant_data: Dict[str, Any], limit: int = 5
         }
 
 
-def calculate_loan_terms(loan_amount: float, loan_term: int, interest_rate: float) -> Dict[str, float]:
+def calculate_flat_interest_loan_terms(loan_amount: float, loan_term: int, interest_rate: float, currency: str = "INR") -> Dict[str, Any]:
+    """
+    Calculate monthly payment and total interest for a loan using flat interest rate.
+    
+    Args:
+        loan_amount: Principal loan amount
+        loan_term: Loan term in months
+        interest_rate: Annual interest rate as a percentage
+        currency: Currency code (default: INR for Indian Rupees)
+        
+    Returns:
+        Dict: Monthly payment, total payment, and total interest
+    """
+    # Calculate total interest for the entire loan term
+    total_interest = loan_amount * (interest_rate / 100) * (loan_term / 12)
+    
+    # Calculate total payment
+    total_payment = loan_amount + total_interest
+    
+    # Calculate monthly payment (equal installments)
+    monthly_payment = total_payment / loan_term
+    
+    # Format currency symbol
+    currency_symbol = "₹" if currency == "INR" else "$"
+    
+    return {
+        "monthly_payment": round(monthly_payment, 2),
+        "total_payment": round(total_payment, 2),
+        "total_interest": round(total_interest, 2),
+        "interest_type": "Flat Interest",
+        "currency": currency,
+        "currency_symbol": currency_symbol
+    }
+
+
+def calculate_loan_terms(loan_amount: float, loan_term: int, interest_rate: float, interest_type: str = "reducing", currency: str = "INR") -> Dict[str, Any]:
     """
     Calculate monthly payment and total interest for a loan.
     
@@ -184,10 +219,20 @@ def calculate_loan_terms(loan_amount: float, loan_term: int, interest_rate: floa
         loan_amount: Principal loan amount
         loan_term: Loan term in months
         interest_rate: Annual interest rate as a percentage
+        interest_type: Type of interest calculation ("reducing" or "flat")
+        currency: Currency code (default: INR for Indian Rupees)
         
     Returns:
         Dict: Monthly payment, total payment, and total interest
     """
+    # Format currency symbol
+    currency_symbol = "₹" if currency == "INR" else "$"
+    
+    # Use flat interest calculation if specified
+    if interest_type.lower() == "flat":
+        return calculate_flat_interest_loan_terms(loan_amount, loan_term, interest_rate, currency)
+    
+    # Otherwise use reducing balance method (EMI)
     # Convert annual interest rate to monthly
     monthly_rate = interest_rate / 12 / 100
     
@@ -201,11 +246,14 @@ def calculate_loan_terms(loan_amount: float, loan_term: int, interest_rate: floa
     return {
         "monthly_payment": round(monthly_payment, 2),
         "total_payment": round(total_payment, 2),
-        "total_interest": round(total_interest, 2)
+        "total_interest": round(total_interest, 2),
+        "interest_type": "Reducing Balance",
+        "currency": currency,
+        "currency_symbol": currency_symbol
     }
 
 
-def generate_amortization_schedule(loan_amount: float, loan_term: int, interest_rate: float) -> List[Dict[str, float]]:
+def generate_amortization_schedule(loan_amount: float, loan_term: int, interest_rate: float, interest_type: str = "reducing", currency: str = "INR") -> List[Dict[str, float]]:
     """
     Generate an amortization schedule for a loan.
     
@@ -213,82 +261,138 @@ def generate_amortization_schedule(loan_amount: float, loan_term: int, interest_
         loan_amount: Principal loan amount
         loan_term: Loan term in months
         interest_rate: Annual interest rate as a percentage
+        interest_type: Type of interest calculation ("reducing" or "flat")
+        currency: Currency code (default: INR for Indian Rupees)
         
     Returns:
         List: Amortization schedule with payment details
     """
-    # Convert annual interest rate to monthly
-    monthly_rate = interest_rate / 12 / 100
+    # Format currency symbol
+    currency_symbol = "₹" if currency == "INR" else "$"
     
-    # Calculate monthly payment
-    monthly_payment = loan_amount * (monthly_rate * (1 + monthly_rate) ** loan_term) / ((1 + monthly_rate) ** loan_term - 1)
-    
-    # Initialize variables
-    remaining_balance = loan_amount
     schedule = []
     
-    # Generate schedule for each payment period
-    for period in range(1, loan_term + 1):
-        # Calculate interest and principal for this period
-        interest_payment = remaining_balance * monthly_rate
-        principal_payment = monthly_payment - interest_payment
+    # Use flat interest calculation if specified
+    if interest_type.lower() == "flat":
+        # Calculate monthly interest
+        monthly_interest = (loan_amount * interest_rate / 100) / 12
         
-        # Update remaining balance
-        remaining_balance -= principal_payment
+        # Calculate monthly principal
+        monthly_principal = loan_amount / loan_term
         
-        # Add payment details to schedule
-        schedule.append({
-            "period": period,
-            "payment": round(monthly_payment, 2),
-            "principal": round(principal_payment, 2),
-            "interest": round(interest_payment, 2),
-            "remaining_balance": round(max(0, remaining_balance), 2)  # Ensure balance doesn't go below 0 due to rounding
-        })
+        # Calculate monthly payment
+        monthly_payment = monthly_principal + monthly_interest
+        
+        # Generate schedule for each payment period
+        remaining_balance = loan_amount
+        for period in range(1, loan_term + 1):
+            # Update remaining balance
+            remaining_balance -= monthly_principal
+            
+            # Add payment details to schedule
+            schedule.append({
+                "period": period,
+                "payment": round(monthly_payment, 2),
+                "principal": round(monthly_principal, 2),
+                "interest": round(monthly_interest, 2),
+                "remaining_balance": round(max(0, remaining_balance), 2),
+                "currency": currency,
+                "currency_symbol": currency_symbol
+            })
+    else:
+        # Reducing balance method (EMI)
+        # Convert annual interest rate to monthly
+        monthly_rate = interest_rate / 12 / 100
+        
+        # Calculate monthly payment
+        monthly_payment = loan_amount * (monthly_rate * (1 + monthly_rate) ** loan_term) / ((1 + monthly_rate) ** loan_term - 1)
+        
+        # Initialize variables
+        remaining_balance = loan_amount
+        
+        # Generate schedule for each payment period
+        for period in range(1, loan_term + 1):
+            # Calculate interest and principal for this period
+            interest_payment = remaining_balance * monthly_rate
+            principal_payment = monthly_payment - interest_payment
+            
+            # Update remaining balance
+            remaining_balance -= principal_payment
+            
+            # Add payment details to schedule
+            schedule.append({
+                "period": period,
+                "payment": round(monthly_payment, 2),
+                "principal": round(principal_payment, 2),
+                "interest": round(interest_payment, 2),
+                "remaining_balance": round(max(0, remaining_balance), 2),
+                "currency": currency,
+                "currency_symbol": currency_symbol
+            })
     
     return schedule
 
 
-def recommend_interest_rate(credit_score: int, loan_term: int, loan_amount: float) -> float:
+def recommend_interest_rate(credit_score: int, loan_term: int, loan_amount: float, interest_type: str = "flat") -> Dict[str, Any]:
     """
     Recommend an interest rate based on credit score and loan details.
+    Uses flat interest rate system with relaxation for high CIBIL scores.
     
     Args:
-        credit_score: Applicant's credit score
+        credit_score: Applicant's credit score (CIBIL score in India)
         loan_term: Loan term in months
         loan_amount: Principal loan amount
+        interest_type: Type of interest calculation ("reducing" or "flat")
         
     Returns:
-        float: Recommended interest rate as a percentage
+        Dict: Recommended interest rate and details
     """
-    # Base rate
-    base_rate = 5.0
-    
-    # Adjust for credit score
-    if credit_score >= 800:
-        credit_adjustment = -1.5
-    elif credit_score >= 750:
-        credit_adjustment = -1.0
-    elif credit_score >= 700:
-        credit_adjustment = -0.5
-    elif credit_score >= 650:
-        credit_adjustment = 0.0
-    elif credit_score >= 600:
-        credit_adjustment = 1.0
+    # Base rate for flat interest
+    if interest_type.lower() == "flat":
+        base_rate = 12.0  # Higher base rate for flat interest
     else:
-        credit_adjustment = 2.0
+        base_rate = 9.0   # Base rate for reducing balance
+    
+    # Special relaxation for CIBIL scores > 750
+    if credit_score > 750:
+        # Apply relaxation for high credit scores
+        if credit_score >= 800:
+            credit_adjustment = -3.0
+        elif credit_score >= 775:
+            credit_adjustment = -2.0
+        else:  # 751-774
+            credit_adjustment = -1.0
+            
+        relaxation_applied = True
+    else:
+        # Standard adjustments for other credit scores
+        if credit_score >= 700:
+            credit_adjustment = -0.5
+        elif credit_score >= 650:
+            credit_adjustment = 0.0
+        elif credit_score >= 600:
+            credit_adjustment = 1.0
+        else:
+            credit_adjustment = 2.0
+            
+        relaxation_applied = False
     
     # Adjust for loan term
-    if loan_term <= 36:
+    if loan_term <= 12:
+        term_adjustment = -0.5
+    elif loan_term <= 36:
         term_adjustment = -0.25
     elif loan_term <= 60:
         term_adjustment = 0.0
     else:
         term_adjustment = 0.5
     
-    # Adjust for loan amount
-    if loan_amount >= 100000:
+    # Adjust for loan amount (in INR)
+    if loan_amount >= 1000000:  # 10 lakhs or more
+        amount_adjustment = -0.5
+    elif loan_amount >= 500000:  # 5 lakhs or more
         amount_adjustment = -0.25
-    elif loan_amount >= 50000:
+    elif loan_amount >= 100000:  # 1 lakh or more
         amount_adjustment = 0.0
     else:
         amount_adjustment = 0.25
@@ -297,9 +401,21 @@ def recommend_interest_rate(credit_score: int, loan_term: int, loan_amount: floa
     recommended_rate = base_rate + credit_adjustment + term_adjustment + amount_adjustment
     
     # Ensure rate is within reasonable bounds
-    recommended_rate = max(2.0, min(recommended_rate, 15.0))
+    if interest_type.lower() == "flat":
+        recommended_rate = max(7.0, min(recommended_rate, 18.0))
+    else:
+        recommended_rate = max(6.0, min(recommended_rate, 16.0))
     
-    return round(recommended_rate, 2)
+    return {
+        "interest_rate": round(recommended_rate, 2),
+        "interest_type": "Flat Interest" if interest_type.lower() == "flat" else "Reducing Balance",
+        "base_rate": base_rate,
+        "credit_adjustment": credit_adjustment,
+        "term_adjustment": term_adjustment,
+        "amount_adjustment": amount_adjustment,
+        "relaxation_applied": relaxation_applied,
+        "credit_score": credit_score
+    }
 
 
 def calculate_effective_annual_rate(nominal_rate: float, compounding_periods: int = 12) -> float:
@@ -323,7 +439,7 @@ def calculate_effective_annual_rate(nominal_rate: float, compounding_periods: in
     return round(ear * 100, 2)
 
 
-def calculate_apr(loan_amount: float, interest_rate: float, loan_term: int, fees: float) -> float:
+def calculate_apr(loan_amount: float, interest_rate: float, loan_term: int, fees: float, interest_type: str = "reducing") -> float:
     """
     Calculate the annual percentage rate (APR) including fees.
     
@@ -332,6 +448,7 @@ def calculate_apr(loan_amount: float, interest_rate: float, loan_term: int, fees
         interest_rate: Annual interest rate as a percentage
         loan_term: Loan term in months
         fees: Total fees charged
+        interest_type: Type of interest calculation ("reducing" or "flat")
         
     Returns:
         float: Annual percentage rate as a percentage
@@ -342,8 +459,21 @@ def calculate_apr(loan_amount: float, interest_rate: float, loan_term: int, fees
     # Convert interest rate to decimal
     interest_decimal = interest_rate / 100
     
-    # Calculate total interest
-    total_interest = loan_amount * interest_decimal * loan_term_years
+    # Calculate total interest based on interest type
+    if interest_type.lower() == "flat":
+        # Flat interest calculation
+        total_interest = loan_amount * interest_decimal * loan_term_years
+    else:
+        # Reducing balance method
+        # Calculate monthly rate
+        monthly_rate = interest_decimal / 12
+        
+        # Calculate monthly payment
+        monthly_payment = loan_amount * (monthly_rate * (1 + monthly_rate) ** loan_term) / ((1 + monthly_rate) ** loan_term - 1)
+        
+        # Calculate total payment and interest
+        total_payment = monthly_payment * loan_term
+        total_interest = total_payment - loan_amount
     
     # Calculate APR
     apr = (fees + total_interest) / (loan_amount * loan_term_years) * 100
