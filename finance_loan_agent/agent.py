@@ -17,7 +17,10 @@ try:
         analyze_loan_application, 
         get_similar_loan_applications,
         calculate_loan_terms,
-        recommend_interest_rate
+        recommend_interest_rate,
+        generate_amortization_schedule,
+        calculate_effective_annual_rate,
+        calculate_apr
     )
 except ImportError:
     # Handle relative import error when running as script
@@ -25,7 +28,10 @@ except ImportError:
         analyze_loan_application, 
         get_similar_loan_applications,
         calculate_loan_terms,
-        recommend_interest_rate
+        recommend_interest_rate,
+        generate_amortization_schedule,
+        calculate_effective_annual_rate,
+        calculate_apr
     )
 
 # --- Utility to safely parse inputs ---
@@ -91,6 +97,21 @@ def create_loan_agent(api_key: Optional[str] = None) -> AgentExecutor:
             name="RecommendInterestRate",
             func=lambda x: recommend_interest_rate(**safe_parse_input(x)),
             description="Recommend an interest rate based on credit score and loan details. Input should be a JSON dictionary with credit_score, loan_term, and loan_amount."
+        ),
+        Tool(
+            name="GenerateAmortizationSchedule",
+            func=lambda x: generate_amortization_schedule(**safe_parse_input(x)),
+            description="Generate an amortization schedule for a loan. Input should be a JSON dictionary with loan_amount, loan_term, and interest_rate."
+        ),
+        Tool(
+            name="CalculateEffectiveAnnualRate",
+            func=lambda x: calculate_effective_annual_rate(**safe_parse_input(x)),
+            description="Calculate the effective annual rate (EAR) from a nominal rate. Input should be a JSON dictionary with nominal_rate and optionally compounding_periods."
+        ),
+        Tool(
+            name="CalculateAPR",
+            func=lambda x: calculate_apr(**safe_parse_input(x)),
+            description="Calculate the annual percentage rate (APR) including fees. Input should be a JSON dictionary with loan_amount, interest_rate, loan_term, and fees."
         )
     ]
 
