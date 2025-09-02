@@ -1,13 +1,40 @@
 import pandas as pd
 import numpy as np
-from models.credit_scoring import CreditScoringModel
-from models.risk_assessment import RiskAssessmentModel
-from .mongodb_tools import get_collection
+from typing import Dict, Any, List, Union, Optional, Tuple
+import sys
+import warnings
 
- 
+# Check if we're using Python 3.13+
+PY_VERSION = sys.version_info
+IS_PY_313_PLUS = PY_VERSION.major == 3 and PY_VERSION.minor >= 13
 
-def analyze_loan_application(applicant_data):
-    """Analyze a loan application and return a risk assessment."""
+# Import models with proper error handling
+try:
+    from ..models.credit_scoring import CreditScoringModel
+    from ..models.risk_assessment import RiskAssessmentModel
+except ImportError:
+    # Handle relative import error when running as script
+    from models.credit_scoring import CreditScoringModel
+    from models.risk_assessment import RiskAssessmentModel
+
+# Import MongoDB tools with proper error handling
+try:
+    from .mongodb_tools import get_collection
+except ImportError:
+    # Handle relative import error when running as script
+    from mongodb_tools import get_collection
+
+
+def analyze_loan_application(applicant_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Analyze a loan application and return a risk assessment.
+    
+    Args:
+        applicant_data: Dictionary containing applicant information
+        
+    Returns:
+        Dict: Risk assessment results including score, level, recommendation, and explanation
+    """
     # Convert applicant data to DataFrame
     df = pd.DataFrame([applicant_data])
     
@@ -15,17 +42,22 @@ def analyze_loan_application(applicant_data):
     model = CreditScoringModel()
     try:
         model.load_model('models/credit_scoring_model.h5')
-    except:
-        # If model doesn't exist, return a default assessment
+    except Exception as e:
+        # If model doesn't exist or can't be loaded, return a default assessment
+        warnings.warn(f"Could not load credit scoring model: {str(e)}. Using default assessment.")
         return {
             "risk_score": 0.5,
             "risk_level": "Medium Risk",
             "recommendation": "Review Manually",
-            "explanation": "Model not trained yet. This is a default assessment."
+            "explanation": "Model not available or not trained yet. This is a default assessment."
         }
     
     # Make prediction
-    risk_score = model.predict(df)[0][0]
+    try:
+        risk_score = model.predict(df)[0][0]
+    except Exception as e:
+        warnings.warn(f"Error making prediction: {str(e)}. Using default assessment.")
+        risk_score = 0.5
     
     # Determine risk level
     if risk_score < 0.3:
@@ -45,8 +77,18 @@ def analyze_loan_application(applicant_data):
         "explanation": generate_explanation(df, risk_score)
     }
 
-def generate_explanation(applicant_data, risk_score):
-    """Generate an explanation for the risk assessment."""
+
+def generate_explanation(applicant_data: pd.DataFrame, risk_score: float) -> str:
+    """
+    Generate an explanation for the risk assessment.
+    
+    Args:
+        applicant_data: DataFrame containing applicant information
+        risk_score: Calculated risk score
+        
+    Returns:
+        str: Explanation of risk factors
+    """
     # This would be more sophisticated in a real application
     factors = []
     
@@ -64,11 +106,26 @@ def generate_explanation(applicant_data, risk_score):
     else:
         return "Risk factors include: " + ", ".join(factors)
 
-def get_similar_loan_applications(applicant_data, limit=5):
-    """Find similar loan applications in the database using vector search."""
+
+def get_similar_loan_applications(applicant_data: Dict[str, Any], limit: int = 5) -> Union[List[Dict[str, Any]], Dict[str, str]]:
+    """
+    Find similar loan applications in the database using vector search.
+    
+    Args:
+        applicant_data: Dictionary containing applicant information and embedding
+        limit: Maximum number of similar applications to return
+        
+    Returns:
+        List of similar loan applications or error message
+    """
     try:
         # Get the collection
         collection = get_collection("loan_applications")
+        
+        # Verify embedding exists
+        if "embedding" not in applicant_data:
+            return {"error": "Missing embedding in applicant data", 
+                    "message": "The applicant data must include an 'embedding' field for vector search."}
         
         # Create a pipeline for vector search
         pipeline = [
@@ -100,10 +157,24 @@ def get_similar_loan_applications(applicant_data, limit=5):
         results = list(collection.aggregate(pipeline))
         return results
     except Exception as e:
-        return {"error": str(e), "message": "Could not perform vector search. Database may not be configured correctly."}
+        return {
+            "error": str(e), 
+            "message": "Could not perform vector search. Database may not be configured correctly."
+        }
 
-def calculate_loan_terms(loan_amount, loan_term, interest_rate):
-    """Calculate monthly payment and total interest for a loan."""
+
+def calculate_loan_terms(loan_amount: float, loan_term: int, interest_rate: float) -> Dict[str, float]:
+    """
+    Calculate monthly payment and total interest for a loan.
+    
+    Args:
+        loan_amount: Principal loan amount
+        loan_term: Loan term in months
+        interest_rate: Annual interest rate as a percentage
+        
+    Returns:
+        Dict: Monthly payment, total payment, and total interest
+    """
     # Convert annual interest rate to monthly
     monthly_rate = interest_rate / 12 / 100
     
@@ -120,8 +191,19 @@ def calculate_loan_terms(loan_amount, loan_term, interest_rate):
         "total_interest": round(total_interest, 2)
     }
 
-def recommend_interest_rate(credit_score, loan_term, loan_amount):
-    """Recommend an interest rate based on credit score and loan details."""
+
+def recommend_interest_rate(credit_score: int, loan_term: int, loan_amount: float) -> float:
+    """
+    Recommend an interest rate based on credit score and loan details.
+    
+    Args:
+        credit_score: Applicant's credit score
+        loan_term: Loan term in months
+        loan_amount: Principal loan amount
+        
+    Returns:
+        float: Recommended interest rate as a percentage
+    """
     # Base rate
     base_rate = 5.0
     

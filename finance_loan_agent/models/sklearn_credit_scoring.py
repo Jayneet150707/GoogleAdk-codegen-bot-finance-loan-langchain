@@ -1,51 +1,29 @@
 """
-Risk Assessment Model with Python 3.13.2 compatibility
+Scikit-learn Credit Scoring Model for Python 3.13.2
 
-This module provides a risk assessment model that works with scikit-learn
-and is compatible with Python 3.13.2.
+This module provides a scikit-learn implementation of the credit scoring model
+that can be used as a fallback when TensorFlow is not available.
 """
 
 import numpy as np
 import pandas as pd
-import warnings
-import os
 import joblib
+import os
+import warnings
 from typing import Dict, Any, List, Union, Optional, Tuple, Callable
-from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
 
-# Import the ML compatibility layer
-try:
-    from .ml_compatibility import (
-        SKLEARN_AVAILABLE,
-        get_model_backend,
-        load_model_safely,
-        save_model_safely,
-        ModelNotAvailableError
-    )
-except ImportError:
-    # Handle relative import error when running as script
-    from ml_compatibility import (
-        SKLEARN_AVAILABLE,
-        get_model_backend,
-        load_model_safely,
-        save_model_safely,
-        ModelNotAvailableError
-    )
-
-# Import scikit-learn for models
-if SKLEARN_AVAILABLE:
-    from sklearn.ensemble import RandomForestClassifier
-    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-
-class RiskAssessmentModel:
+class SklearnCreditScoringModel:
     """
-    Risk assessment model using scikit-learn, compatible with Python 3.13.2.
+    Credit scoring model using scikit-learn, compatible with Python 3.13.2.
     """
     
     def __init__(self, n_estimators: int = 100, max_depth: int = 10, random_state: int = 42):
         """
-        Initialize the risk assessment model.
+        Initialize the credit scoring model.
         
         Args:
             n_estimators: Number of trees in the random forest
@@ -55,20 +33,12 @@ class RiskAssessmentModel:
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.random_state = random_state
+        self.model = RandomForestRegressor(
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            random_state=random_state
+        )
         self.scaler = StandardScaler()
-        
-        if SKLEARN_AVAILABLE:
-            self.model = RandomForestClassifier(
-                n_estimators=n_estimators,
-                max_depth=max_depth,
-                random_state=random_state
-            )
-        else:
-            self.model = None
-            warnings.warn(
-                "scikit-learn is not available. Risk assessment model will provide default predictions only. "
-                "Please install scikit-learn for full functionality."
-            )
     
     def preprocess_data(self, X: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
         """
@@ -83,25 +53,19 @@ class RiskAssessmentModel:
         return self.scaler.transform(X)
     
     def train(self, X: Union[pd.DataFrame, np.ndarray], y: Union[pd.Series, np.ndarray], 
-              validation_split: float = 0.2) -> Dict[str, float]:
+              validation_split: float = 0.2, **kwargs) -> Dict[str, float]:
         """
-        Train the risk assessment model.
+        Train the credit scoring model.
         
         Args:
             X: Input features
             y: Target values
             validation_split: Fraction of data to use for validation
+            **kwargs: Additional arguments (ignored, for compatibility with TensorFlow model)
             
         Returns:
-            Dict: Training and validation scores
+            Dict: Training and validation metrics
         """
-        if not SKLEARN_AVAILABLE:
-            warnings.warn("scikit-learn is not available, training skipped")
-            return {
-                'train_score': 0.0,
-                'validation_score': 0.0
-            }
-        
         # Split the data
         X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=validation_split, random_state=42)
         
@@ -114,12 +78,20 @@ class RiskAssessmentModel:
         self.model.fit(X_train_scaled, y_train)
         
         # Evaluate the model
-        train_score = self.model.score(X_train_scaled, y_train)
-        val_score = self.model.score(X_val_scaled, y_val)
+        train_pred = self.model.predict(X_train_scaled)
+        val_pred = self.model.predict(X_val_scaled)
+        
+        train_mse = mean_squared_error(y_train, train_pred)
+        val_mse = mean_squared_error(y_val, val_pred)
+        
+        train_r2 = r2_score(y_train, train_pred)
+        val_r2 = r2_score(y_val, val_pred)
         
         return {
-            'train_score': train_score,
-            'validation_score': val_score
+            'train_mse': train_mse,
+            'val_mse': val_mse,
+            'train_r2': train_r2,
+            'val_r2': val_r2
         }
     
     def predict(self, X: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
@@ -132,29 +104,14 @@ class RiskAssessmentModel:
         Returns:
             np.ndarray: Predictions
         """
-        if not SKLEARN_AVAILABLE or self.model is None:
-            warnings.warn("Model not available or not trained, returning default predictions")
-            return np.zeros(X.shape[0], dtype=int)
-        
         X_scaled = self.preprocess_data(X)
-        return self.model.predict(X_scaled)
-    
-    def predict_proba(self, X: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
-        """
-        Get probability estimates for each class.
+        preds = self.model.predict(X_scaled)
         
-        Args:
-            X: Input features
-            
-        Returns:
-            np.ndarray: Probability estimates
-        """
-        if not SKLEARN_AVAILABLE or self.model is None:
-            warnings.warn("Model not available or not trained, returning default probabilities")
-            return np.full((X.shape[0], 2), 0.5)
+        # Ensure predictions are in the range [0, 1] to match TensorFlow model
+        preds = np.clip(preds, 0, 1)
         
-        X_scaled = self.preprocess_data(X)
-        return self.model.predict_proba(X_scaled)
+        # Reshape to match TensorFlow model output shape
+        return preds.reshape(-1, 1)
     
     def get_feature_importance(self, feature_names: List[str]) -> List[Dict[str, Union[str, float]]]:
         """
@@ -165,16 +122,9 @@ class RiskAssessmentModel:
             
         Returns:
             List[Dict]: Feature importance information
-            
-        Raises:
-            ValueError: If the model does not have feature importances
         """
-        if not SKLEARN_AVAILABLE or self.model is None:
-            warnings.warn("Model not available or not trained, cannot get feature importance")
-            return []
-        
         if not hasattr(self.model, 'feature_importances_'):
-            raise ValueError("Model does not have feature importances")
+            return []
         
         importances = self.model.feature_importances_
         indices = np.argsort(importances)[::-1]
@@ -198,15 +148,11 @@ class RiskAssessmentModel:
         Returns:
             bool: True if saving was successful, False otherwise
         """
-        if not SKLEARN_AVAILABLE or self.model is None:
-            warnings.warn("Model not available or not trained, cannot save")
-            return False
-        
         # Create directory if it doesn't exist
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         
         # Save the scaler
-        scaler_path = os.path.join(os.path.dirname(filepath), 'risk_scaler.pkl')
+        scaler_path = os.path.join(os.path.dirname(filepath), 'sklearn_scaler.pkl')
         try:
             joblib.dump(self.scaler, scaler_path)
         except Exception as e:
@@ -230,12 +176,8 @@ class RiskAssessmentModel:
         Returns:
             bool: True if loading was successful, False otherwise
         """
-        if not SKLEARN_AVAILABLE:
-            warnings.warn("scikit-learn is not available, cannot load model")
-            return False
-        
         # Try to load the scaler
-        scaler_path = os.path.join(os.path.dirname(filepath), 'risk_scaler.pkl')
+        scaler_path = os.path.join(os.path.dirname(filepath), 'sklearn_scaler.pkl')
         try:
             if os.path.exists(scaler_path):
                 self.scaler = joblib.load(scaler_path)

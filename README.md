@@ -1,14 +1,15 @@
 # Finance Loan Agent with LangChain and MongoDB
 
-This project demonstrates how to build an AI-powered loan processing agent using LangChain and MongoDB Atlas Vector Search. The agent can analyze loan applications, assess credit risk, and provide recommendations for loan approval.
+This project demonstrates how to build an AI-powered loan processing agent using LangChain and Google Generative AI. The agent can analyze loan applications, assess credit risk, and provide recommendations for loan approval.
 
 ## Features
 
-- **Credit Risk Assessment**: Deep learning model to predict default risk
+- **Credit Risk Assessment**: Machine learning models to predict default risk
 - **Vector Search**: Find similar loan applications using MongoDB Atlas Vector Search
 - **Loan Term Calculation**: Calculate monthly payments and total interest
 - **Interest Rate Recommendation**: Suggest interest rates based on applicant profile
 - **Explainable AI**: Provide explanations for risk assessments
+- **Python 3.13.2 Compatible**: Works with the latest Python version
 
 ## Project Structure
 
@@ -19,7 +20,10 @@ finance_loan_agent/
 ├── models/
 │   ├── __init__.py
 │   ├── credit_scoring.py
-│   └── risk_assessment.py
+│   ├── risk_assessment.py
+│   ├── ml_compatibility.py
+│   ├── sklearn_credit_scoring.py
+│   └── sklearn_risk_assessment.py
 ├── tools/
 │   ├── __init__.py
 │   ├── mongodb_tools.py
@@ -30,6 +34,17 @@ finance_loan_agent/
 ├── run_agent.py
 └── .env.example
 ```
+
+## Python 3.13.2 Compatibility
+
+This project is fully compatible with Python 3.13.2. It includes:
+
+- Fallback mechanisms for TensorFlow (which is not yet compatible with Python 3.13)
+- Alternative scikit-learn implementations of ML models
+- Improved error handling and type hints
+- Standardized import paths
+
+For more details, see [Python 3.13 Compatibility Guide](docs/python_3_13_compatibility.md).
 
 ## Setup Instructions
 

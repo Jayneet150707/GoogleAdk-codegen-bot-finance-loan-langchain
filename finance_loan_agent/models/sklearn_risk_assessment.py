@@ -1,44 +1,22 @@
 """
-Risk Assessment Model with Python 3.13.2 compatibility
+Scikit-learn Risk Assessment Model for Python 3.13.2
 
-This module provides a risk assessment model that works with scikit-learn
-and is compatible with Python 3.13.2.
+This module provides a scikit-learn implementation of the risk assessment model
+that is compatible with Python 3.13.2.
 """
 
 import numpy as np
 import pandas as pd
-import warnings
-import os
 import joblib
+import os
+import warnings
 from typing import Dict, Any, List, Union, Optional, Tuple, Callable
-from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-# Import the ML compatibility layer
-try:
-    from .ml_compatibility import (
-        SKLEARN_AVAILABLE,
-        get_model_backend,
-        load_model_safely,
-        save_model_safely,
-        ModelNotAvailableError
-    )
-except ImportError:
-    # Handle relative import error when running as script
-    from ml_compatibility import (
-        SKLEARN_AVAILABLE,
-        get_model_backend,
-        load_model_safely,
-        save_model_safely,
-        ModelNotAvailableError
-    )
-
-# Import scikit-learn for models
-if SKLEARN_AVAILABLE:
-    from sklearn.ensemble import RandomForestClassifier
-    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-
-class RiskAssessmentModel:
+class SklearnRiskAssessmentModel:
     """
     Risk assessment model using scikit-learn, compatible with Python 3.13.2.
     """
@@ -55,20 +33,12 @@ class RiskAssessmentModel:
         self.n_estimators = n_estimators
         self.max_depth = max_depth
         self.random_state = random_state
+        self.model = RandomForestClassifier(
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            random_state=random_state
+        )
         self.scaler = StandardScaler()
-        
-        if SKLEARN_AVAILABLE:
-            self.model = RandomForestClassifier(
-                n_estimators=n_estimators,
-                max_depth=max_depth,
-                random_state=random_state
-            )
-        else:
-            self.model = None
-            warnings.warn(
-                "scikit-learn is not available. Risk assessment model will provide default predictions only. "
-                "Please install scikit-learn for full functionality."
-            )
     
     def preprocess_data(self, X: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
         """
@@ -93,15 +63,8 @@ class RiskAssessmentModel:
             validation_split: Fraction of data to use for validation
             
         Returns:
-            Dict: Training and validation scores
+            Dict: Training and validation metrics
         """
-        if not SKLEARN_AVAILABLE:
-            warnings.warn("scikit-learn is not available, training skipped")
-            return {
-                'train_score': 0.0,
-                'validation_score': 0.0
-            }
-        
         # Split the data
         X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=validation_split, random_state=42)
         
@@ -114,12 +77,30 @@ class RiskAssessmentModel:
         self.model.fit(X_train_scaled, y_train)
         
         # Evaluate the model
-        train_score = self.model.score(X_train_scaled, y_train)
-        val_score = self.model.score(X_val_scaled, y_val)
+        train_pred = self.model.predict(X_train_scaled)
+        val_pred = self.model.predict(X_val_scaled)
+        
+        train_accuracy = accuracy_score(y_train, train_pred)
+        val_accuracy = accuracy_score(y_val, val_pred)
+        
+        train_precision = precision_score(y_train, train_pred, average='weighted', zero_division=0)
+        val_precision = precision_score(y_val, val_pred, average='weighted', zero_division=0)
+        
+        train_recall = recall_score(y_train, train_pred, average='weighted', zero_division=0)
+        val_recall = recall_score(y_val, val_pred, average='weighted', zero_division=0)
+        
+        train_f1 = f1_score(y_train, train_pred, average='weighted', zero_division=0)
+        val_f1 = f1_score(y_val, val_pred, average='weighted', zero_division=0)
         
         return {
-            'train_score': train_score,
-            'validation_score': val_score
+            'train_accuracy': train_accuracy,
+            'val_accuracy': val_accuracy,
+            'train_precision': train_precision,
+            'val_precision': val_precision,
+            'train_recall': train_recall,
+            'val_recall': val_recall,
+            'train_f1': train_f1,
+            'val_f1': val_f1
         }
     
     def predict(self, X: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
@@ -132,10 +113,6 @@ class RiskAssessmentModel:
         Returns:
             np.ndarray: Predictions
         """
-        if not SKLEARN_AVAILABLE or self.model is None:
-            warnings.warn("Model not available or not trained, returning default predictions")
-            return np.zeros(X.shape[0], dtype=int)
-        
         X_scaled = self.preprocess_data(X)
         return self.model.predict(X_scaled)
     
@@ -149,10 +126,6 @@ class RiskAssessmentModel:
         Returns:
             np.ndarray: Probability estimates
         """
-        if not SKLEARN_AVAILABLE or self.model is None:
-            warnings.warn("Model not available or not trained, returning default probabilities")
-            return np.full((X.shape[0], 2), 0.5)
-        
         X_scaled = self.preprocess_data(X)
         return self.model.predict_proba(X_scaled)
     
@@ -165,16 +138,9 @@ class RiskAssessmentModel:
             
         Returns:
             List[Dict]: Feature importance information
-            
-        Raises:
-            ValueError: If the model does not have feature importances
         """
-        if not SKLEARN_AVAILABLE or self.model is None:
-            warnings.warn("Model not available or not trained, cannot get feature importance")
-            return []
-        
         if not hasattr(self.model, 'feature_importances_'):
-            raise ValueError("Model does not have feature importances")
+            return []
         
         importances = self.model.feature_importances_
         indices = np.argsort(importances)[::-1]
@@ -198,15 +164,11 @@ class RiskAssessmentModel:
         Returns:
             bool: True if saving was successful, False otherwise
         """
-        if not SKLEARN_AVAILABLE or self.model is None:
-            warnings.warn("Model not available or not trained, cannot save")
-            return False
-        
         # Create directory if it doesn't exist
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         
         # Save the scaler
-        scaler_path = os.path.join(os.path.dirname(filepath), 'risk_scaler.pkl')
+        scaler_path = os.path.join(os.path.dirname(filepath), 'sklearn_risk_scaler.pkl')
         try:
             joblib.dump(self.scaler, scaler_path)
         except Exception as e:
@@ -230,12 +192,8 @@ class RiskAssessmentModel:
         Returns:
             bool: True if loading was successful, False otherwise
         """
-        if not SKLEARN_AVAILABLE:
-            warnings.warn("scikit-learn is not available, cannot load model")
-            return False
-        
         # Try to load the scaler
-        scaler_path = os.path.join(os.path.dirname(filepath), 'risk_scaler.pkl')
+        scaler_path = os.path.join(os.path.dirname(filepath), 'sklearn_risk_scaler.pkl')
         try:
             if os.path.exists(scaler_path):
                 self.scaler = joblib.load(scaler_path)
