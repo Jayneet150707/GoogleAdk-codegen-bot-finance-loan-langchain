@@ -35,8 +35,21 @@ def analyze_loan_application(applicant_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dict: Risk assessment results including score, level, recommendation, and explanation
     """
+    # Map input field names to expected model field names
+    field_mapping = {
+        'annual_income': 'income',
+        'debt_to_income_ratio': 'debt_to_income',
+    }
+    
+    # Create a new dictionary with mapped field names
+    mapped_data = {}
+    for key, value in applicant_data.items():
+        # Use the mapped field name if available, otherwise use the original
+        mapped_key = field_mapping.get(key, key)
+        mapped_data[mapped_key] = value
+    
     # Convert applicant data to DataFrame
-    df = pd.DataFrame([applicant_data])
+    df = pd.DataFrame([mapped_data])
     
     # Load the credit scoring model
     model = CreditScoringModel()
