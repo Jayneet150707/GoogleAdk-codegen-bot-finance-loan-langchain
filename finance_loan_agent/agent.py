@@ -4,6 +4,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 import json
 import importlib.util
 import sys
+import re
 from typing import Dict, Any, Union, List, Optional
 
 # Check if we're using Python 3.13+
@@ -42,6 +43,10 @@ def safe_parse_input(x: Any) -> Dict[str, Any]:
         ValueError: If input is a string but not valid JSON
     """
     if isinstance(x, str):
+        # Remove markdown code block formatting if present
+        x = re.sub(r'^```(?:json)?\s*', '', x)
+        x = re.sub(r'\s*```$', '', x)
+        
         try:
             return json.loads(x)
         except json.JSONDecodeError:
@@ -100,7 +105,7 @@ When answering, always follow this format:
 Question: the input question
 Thought: reasoning about what to do
 Action: the tool name to use, one of [{tool_names}]
-Action Input: the input to the tool
+Action Input: the input to the tool (provide a valid JSON object without markdown formatting)
 Observation: the result of the action
 ... (this Thought/Action/Observation can repeat)
 Final Answer: the answer to the original question
