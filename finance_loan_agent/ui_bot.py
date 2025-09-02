@@ -385,7 +385,16 @@ def display_chat_interface():
             st.error(f"Error processing message: {str(e)}")
             
         # Rerun to update the display
-        st.experimental_rerun()
+        try:
+            # Try the new method first (Streamlit >= 1.27.0)
+            st.rerun()
+        except AttributeError:
+            # Fall back to the old method for older Streamlit versions
+            try:
+                st.experimental_rerun()
+            except AttributeError:
+                # If both fail, just inform the user to refresh
+                st.info("Please refresh the page to see your message and response.")
 
 def main():
     """Main function to run the Streamlit app."""
