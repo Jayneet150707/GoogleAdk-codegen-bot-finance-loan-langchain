@@ -1,0 +1,119 @@
+/* Custom CSS for the Loan Processing Assistant UI */
+
+/* Main container */
+.main {
+    padding: 1rem;
+}
+
+/* Header styling */
+.stTitle {
+    color: #1E3A8A;
+    font-weight: 700;
+}
+
+/* Sidebar styling */
+.sidebar .sidebar-content {
+    background-color: #F3F4F6;
+}
+
+/* Form styling */
+.stForm {
+    background-color: #F9FAFB;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* Button styling */
+.stButton>button {
+    background-color: #1E3A8A;
+    color: white;
+    border-radius: 0.25rem;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+}
+
+.stButton>button:hover {
+    background-color: #1E40AF;
+}
+
+/* Metrics styling */
+.stMetric {
+    background-color: #EFF6FF;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.stMetric label {
+    font-weight: 600;
+    color: #1E3A8A;
+}
+
+.stMetric .metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1E3A8A;
+}
+
+/* Chat message styling */
+.chat-message {
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0.5rem;
+}
+
+.chat-message.user {
+    background-color: #EFF6FF;
+    margin-left: 2rem;
+}
+
+.chat-message.assistant {
+    background-color: #F3F4F6;
+    margin-right: 2rem;
+}
+
+/* Tabs styling */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 1rem;
+}
+
+.stTabs [data-baseweb="tab"] {
+    height: 3rem;
+    white-space: pre-wrap;
+    background-color: #F3F4F6;
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: #EFF6FF;
+    border-bottom: 2px solid #1E3A8A;
+}
+
+/* Input fields styling */
+.stNumberInput input, .stTextInput input, .stTextArea textarea {
+    border-radius: 0.25rem;
+    border: 1px solid #D1D5DB;
+}
+
+.stNumberInput input:focus, .stTextInput input:focus, .stTextArea textarea:focus {
+    border-color: #1E3A8A;
+    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2);
+}
+
+/* Select box styling */
+.stSelectbox select {
+    border-radius: 0.25rem;
+    border: 1px solid #D1D5DB;
+}
+
+/* Error message styling */
+.stAlert {
+    border-radius: 0.25rem;
+}
+
+/* Spinner styling */
+.stSpinner > div {
+    border-color: #1E3A8A transparent transparent transparent;
+}
+
