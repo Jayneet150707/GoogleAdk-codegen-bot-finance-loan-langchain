@@ -205,6 +205,49 @@ def calculate_loan_terms(loan_amount: float, loan_term: int, interest_rate: floa
     }
 
 
+def generate_amortization_schedule(loan_amount: float, loan_term: int, interest_rate: float) -> List[Dict[str, float]]:
+    """
+    Generate an amortization schedule for a loan.
+    
+    Args:
+        loan_amount: Principal loan amount
+        loan_term: Loan term in months
+        interest_rate: Annual interest rate as a percentage
+        
+    Returns:
+        List: Amortization schedule with payment details
+    """
+    # Convert annual interest rate to monthly
+    monthly_rate = interest_rate / 12 / 100
+    
+    # Calculate monthly payment
+    monthly_payment = loan_amount * (monthly_rate * (1 + monthly_rate) ** loan_term) / ((1 + monthly_rate) ** loan_term - 1)
+    
+    # Initialize variables
+    remaining_balance = loan_amount
+    schedule = []
+    
+    # Generate schedule for each payment period
+    for period in range(1, loan_term + 1):
+        # Calculate interest and principal for this period
+        interest_payment = remaining_balance * monthly_rate
+        principal_payment = monthly_payment - interest_payment
+        
+        # Update remaining balance
+        remaining_balance -= principal_payment
+        
+        # Add payment details to schedule
+        schedule.append({
+            "period": period,
+            "payment": round(monthly_payment, 2),
+            "principal": round(principal_payment, 2),
+            "interest": round(interest_payment, 2),
+            "remaining_balance": round(max(0, remaining_balance), 2)  # Ensure balance doesn't go below 0 due to rounding
+        })
+    
+    return schedule
+
+
 def recommend_interest_rate(credit_score: int, loan_term: int, loan_amount: float) -> float:
     """
     Recommend an interest rate based on credit score and loan details.
@@ -257,4 +300,53 @@ def recommend_interest_rate(credit_score: int, loan_term: int, loan_amount: floa
     recommended_rate = max(2.0, min(recommended_rate, 15.0))
     
     return round(recommended_rate, 2)
+
+
+def calculate_effective_annual_rate(nominal_rate: float, compounding_periods: int = 12) -> float:
+    """
+    Calculate the effective annual rate (EAR) from a nominal rate.
+    
+    Args:
+        nominal_rate: Nominal annual interest rate as a percentage
+        compounding_periods: Number of compounding periods per year
+        
+    Returns:
+        float: Effective annual rate as a percentage
+    """
+    # Convert nominal rate to decimal
+    nominal_decimal = nominal_rate / 100
+    
+    # Calculate effective annual rate
+    ear = ((1 + nominal_decimal / compounding_periods) ** compounding_periods) - 1
+    
+    # Convert back to percentage
+    return round(ear * 100, 2)
+
+
+def calculate_apr(loan_amount: float, interest_rate: float, loan_term: int, fees: float) -> float:
+    """
+    Calculate the annual percentage rate (APR) including fees.
+    
+    Args:
+        loan_amount: Principal loan amount
+        interest_rate: Annual interest rate as a percentage
+        loan_term: Loan term in months
+        fees: Total fees charged
+        
+    Returns:
+        float: Annual percentage rate as a percentage
+    """
+    # Convert loan term to years
+    loan_term_years = loan_term / 12
+    
+    # Convert interest rate to decimal
+    interest_decimal = interest_rate / 100
+    
+    # Calculate total interest
+    total_interest = loan_amount * interest_decimal * loan_term_years
+    
+    # Calculate APR
+    apr = (fees + total_interest) / (loan_amount * loan_term_years) * 100
+    
+    return round(apr, 2)
 

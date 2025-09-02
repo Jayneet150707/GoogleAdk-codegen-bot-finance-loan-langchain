@@ -20,9 +20,21 @@ IS_PY_313_PLUS = PY_VERSION.major == 3 and PY_VERSION.minor >= 13
 # Import agent with proper error handling
 try:
     from .agent import create_loan_agent
+    from .tools.finance_tools import (
+        calculate_loan_terms,
+        generate_amortization_schedule,
+        calculate_effective_annual_rate,
+        calculate_apr
+    )
 except ImportError:
     # Handle relative import error when running as script
     from agent import create_loan_agent
+    from tools.finance_tools import (
+        calculate_loan_terms,
+        generate_amortization_schedule,
+        calculate_effective_annual_rate,
+        calculate_apr
+    )
 
 # Load environment variables
 load_dotenv()
@@ -77,6 +89,7 @@ def display_sidebar():
         - Calculate loan terms
         - Recommend interest rates
         - Find similar loan applications
+        - Generate amortization schedules
         """
     )
     
@@ -112,27 +125,89 @@ def display_loan_calculator():
         loan_term = st.number_input("Loan Term (months)", min_value=12, max_value=360, value=48, step=12)
     
     if st.button("Calculate"):
-        # Convert annual interest rate to monthly
-        monthly_rate = interest_rate / 12 / 100
-        
-        # Calculate monthly payment
-        monthly_payment = loan_amount * (monthly_rate * (1 + monthly_rate) ** loan_term) / ((1 + monthly_rate) ** loan_term - 1)
-        
-        # Calculate total payment and interest
-        total_payment = monthly_payment * loan_term
-        total_interest = total_payment - loan_amount
+        # Calculate loan terms
+        terms = calculate_loan_terms(loan_amount, loan_term, interest_rate)
         
         # Display results
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.metric("Monthly Payment", f"${monthly_payment:.2f}")
+            st.metric("Monthly Payment", f"${terms['monthly_payment']:.2f}")
         
         with col2:
-            st.metric("Total Payment", f"${total_payment:.2f}")
+            st.metric("Total Payment", f"${terms['total_payment']:.2f}")
         
         with col3:
-            st.metric("Total Interest", f"${total_interest:.2f}")
+            st.metric("Total Interest", f"${terms['total_interest']:.2f}")
+        
+        # Calculate effective annual rate
+        ear = calculate_effective_annual_rate(interest_rate)
+        st.info(f"Effective Annual Rate (EAR): {ear:.2f}%")
+        
+        # Option to show amortization schedule
+        if st.checkbox("Show Amortization Schedule"):
+            schedule = generate_amortization_schedule(loan_amount, loan_term, interest_rate)
+            
+            # Convert to DataFrame for display
+            df = pd.DataFrame(schedule)
+            
+            # Format columns
+            df['payment'] = df['payment'].map('${:,.2f}'.format)
+            df['principal'] = df['principal'].map('${:,.2f}'.format)
+            df['interest'] = df['interest'].map('${:,.2f}'.format)
+            df['remaining_balance'] = df['remaining_balance'].map('${:,.2f}'.format)
+            
+            # Rename columns
+            df = df.rename(columns={
+                'period': 'Payment #',
+                'payment': 'Payment',
+                'principal': 'Principal',
+                'interest': 'Interest',
+                'remaining_balance': 'Remaining Balance'
+            })
+            
+            # Display the schedule
+            st.subheader("Amortization Schedule")
+            st.dataframe(df, use_container_width=True)
+            
+            # Display a chart of principal vs interest over time
+            st.subheader("Principal vs Interest Over Time")
+            
+            # Convert back to numeric for charting
+            chart_data = pd.DataFrame(schedule)
+            
+            # Create a stacked bar chart
+            chart_data = chart_data.set_index('period')
+            st.bar_chart(chart_data[['principal', 'interest']])
+
+def display_apr_calculator():
+    """Display an APR calculator."""
+    st.header("APR Calculator")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        loan_amount = st.number_input("Loan Amount ($)", min_value=1000, max_value=1000000, value=25000, step=1000, key="apr_loan_amount")
+        interest_rate = st.number_input("Interest Rate (%)", min_value=1.0, max_value=20.0, value=5.0, step=0.1, key="apr_interest_rate")
+    
+    with col2:
+        loan_term = st.number_input("Loan Term (months)", min_value=12, max_value=360, value=48, step=12, key="apr_loan_term")
+        fees = st.number_input("Fees ($)", min_value=0, max_value=10000, value=500, step=100)
+    
+    if st.button("Calculate APR"):
+        # Calculate APR
+        apr = calculate_apr(loan_amount, interest_rate, loan_term, fees)
+        
+        # Display results
+        st.metric("Annual Percentage Rate (APR)", f"{apr:.2f}%")
+        
+        # Display explanation
+        st.info(
+            """
+            The Annual Percentage Rate (APR) includes both the interest rate and any fees charged.
+            It represents the true cost of borrowing and is typically higher than the stated interest rate.
+            """
+        )
 
 def display_loan_application_form():
     """Display a loan application form."""
@@ -240,7 +315,7 @@ def main():
         return
     
     # Create tabs
-    tab1, tab2, tab3 = st.tabs(["Chat", "Loan Application", "Loan Calculator"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Chat", "Loan Application", "Loan Calculator", "APR Calculator"])
     
     with tab1:
         display_chat_interface()
@@ -250,6 +325,9 @@ def main():
     
     with tab3:
         display_loan_calculator()
+    
+    with tab4:
+        display_apr_calculator()
 
 if __name__ == "__main__":
     main()
